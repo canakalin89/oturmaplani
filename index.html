@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sınıf Planlayıcı – Tek Dosya</title>
+  <style>
+    :root{
+      --bg:#0f172a; --panel:#0b1220; --paper-bg:#ffffff; --ink:#e5e7eb; --muted:#94a3b8;
+      --line:#1e293b; --accent:#60a5fa; --accent-ink:#0b1220; --chip:#111827; --chip-line:#233044;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0b1220,#0f172a 40%,#0b1220 100%);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
+
+    /* Yerleşim */
+    .app{display:grid;grid-template-columns:360px 1fr;gap:16px;height:100%;padding:16px}
+
+    /* Panel */
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;overflow:auto;box-shadow:var(--shadow)}
+    .brand{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .brand svg{width:18px;height:18px}
+    h1{font-size:18px;margin:0}
+    h2{font-size:12px;margin:16px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    label{display:inline-flex;gap:6px;align-items:center}
+    input[type="text"],textarea,select{border:1px solid var(--line);padding:10px 12px;border-radius:10px;background:#0a1526;color:var(--ink)}
+    textarea{width:100%;min-height:110px;resize:vertical}
+    .btn{border:1px solid var(--chip-line);background:var(--chip);padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--ink)}
+    .btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink);font-weight:700}
+    .btn.icon{display:inline-flex;align-items:center;gap:8px}
+    .divider{height:1px;background:var(--line);margin:14px 0}
+    .legend{color:var(--muted);font-size:12px}
+
+    /* Öğrenci havuzu */
+    .students{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .pill{border:1px solid var(--chip-line);padding:6px 10px;border-radius:999px;background:var(--chip);cursor:grab;user-select:none}
+
+    /* Sağ taraf */
+    .main{display:flex;flex-direction:column;gap:12px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--line);background:linear-gradient(180deg,#0e1a30,#0a1426);border-radius:16px;box-shadow:var(--shadow)}
+    .topbar .title{font-size:16px;font-weight:700}
+    .topbar .actions{display:flex;gap:8px;align-items:center}
+
+    /* A4 kağıt alanı */
+    .paper-wrap{flex:1;display:flex;justify-content:center;align-items:flex-start}
+    .paper{position:relative;background:var(--paper-bg);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 12px 40px rgba(15,23,42,.35);aspect-ratio:210/297;width:100%;max-width:930px;height:auto;overflow:hidden}
+
+    /* Başlık */
+    .header{position:absolute;inset:0 0 auto 0;height:86px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;padding:12px 16px;color:#111827}
+    .header .logo{width:auto;max-width:160px;max-height:64px;object-fit:contain}
+    .header .meta{display:flex;flex-direction:column;line-height:1.2}
+    .header .school{font-weight:800;font-size:16px}
+    .header .class{font-weight:700;color:#334155}
+    .header .teacher{font-weight:700;color:#475569}
+    .header .date{font-size:12px;color:#64748b}
+    .credit{position:absolute;bottom:10px;right:14px;color:#64748b;font-size:11px}
+
+    /* Öğeler */
+    .item{position:absolute;background:#fff;border:2px solid #cbd5e1;border-radius:12px;box-shadow:0 4px 16px rgba(15,23,42,.12);min-width:90px;min-height:60px}
+    .item.locked{border-style:dashed;opacity:.9}
+    .item.selected{outline:3px solid var(--accent);outline-offset:2px}
+    .handle{position:absolute;top:0;left:0;right:0;height:26px;background:#f1f5f9;border-bottom:1px solid #e5e7eb;border-radius:10px 10px 0 0;cursor:grab;display:flex;align-items:center;gap:8px;padding:0 10px;color:#334155;font-size:12px}
+    .handle .grow{flex:1}
+    .resize{position:absolute;width:12px;height:12px;right:-6px;bottom:-6px;border:2px solid var(--accent);background:#fff;border-radius:3px;cursor:nwse-resize}
+
+    /* Sıra gövdesi */
+    .desk-body{position:absolute;inset:30px 10px 10px 10px;display:flex;flex-direction:row;gap:8px}
+    .slot{flex:1;border:1px dashed #cbd5e1;background:#fff;border-radius:8px;padding:8px 10px;text-align:center;font-weight:800;min-height:30px}
+    .slot.editing input{width:100%;border:1px solid #e5e7eb;border-radius:6px;padding:6px 8px;text-align:center}
+    .slot.sel{outline:2px solid var(--accent); outline-offset:2px}
+
+    /* Serbest nesne etiketi */
+    .badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;border:1px solid #e5e7eb;background:#eef2ff;color:#334155}
+
+    /* Kılavuz ızgara (sadece ekranda) */
+    .paper.with-grid{background-image:
+      repeating-linear-gradient(#e5e7eb 0 1px, transparent 1px 24px),
+      repeating-linear-gradient(90deg, #e5e7eb 0 1px, transparent 1px 24px);
+      background-size:100% 100%}
+
+    /* Export sırasında gizlenecekler */
+    .paper.exporting .handle, .paper.exporting .resize, .paper.exporting .no-export{display:none!important}
+
+    /* Baskı */
+    @media print{
+      @page { size: A4 portrait; margin: 10mm; }
+      .panel{display:none!important}
+      .paper.with-grid{background:none!important}
+      .paper .no-export{display:none!important}
+      body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 21h10"/></svg>
+      <h1>Sınıf Planlayıcı</h1>
+    </div>
+
+    <h2>Başlık</h2>
+    <div class="row"><input id="schoolName" type="text" placeholder="Okul adı"><input id="className" type="text" placeholder="Sınıf adı"><input id="teacherName" type="text" placeholder="Sınıf öğretmeni"></div>
+    <div class="row"><label class="no-print" style="display:inline-flex;align-items:center;gap:6px"><input id="logoInput" type="file" accept="image/*" style="display:none"><button id="logoBtn" class="btn">Logo yükle</button></label><button id="logoClear" class="btn">Logoyu kaldır</button></div>
+
+    <div class="divider"></div>
+    <h2>Öğrenciler</h2>
+    <textarea id="names" placeholder="Her satıra bir isim"></textarea>
+    <div class="row"><button id="loadNames" class="btn primary">Havuza ekle</button><button id="clearNames" class="btn">Havuzu temizle</button></div>
+    <div id="studentPool" class="students" aria-label="Öğrenci havuzu"></div>
+    <div class="legend">İsimleri sıraya sürükleyin. Tıkla düzenle, çift tıkla kaldır.</div>
+
+    <div class="divider"></div>
+    <h2>Yazı stili (seçili yuva)</h2>
+    <div class="row">
+      <label>Renk: <input id="styleColor" type="color" value="#111827"></label>
+      <label><input id="styleBold" type="checkbox" checked> Kalın</label>
+      <button id="applyStyle" class="btn">Stili uygula</button>
+      <button id="applyStyleDesk" class="btn">Tüm sıraya uygula</button>
+    </div>
+
+    <div class="divider"></div>
+    <h2>Öğe ekle</h2>
+    <div class="row"><label>Kapasite:<select id="deskCap"><option value="2" selected>2</option><option value="1">1</option></select></label><button id="addDesk" class="btn primary">+ Sıra</button></div>
+    <div class="row"><input id="objName" type="text" placeholder="Nesne adı (örn. Tahta, Kapı)"><button id="addObject" class="btn">+ Nesne</button></div>
+
+    <div class="divider"></div>
+    <h2>İşlemler</h2>
+    <div class="row"><label><input type="checkbox" id="snapToggle" checked> Izgaraya hizala</label><label><input type="checkbox" id="gridToggle" checked> Kılavuz ızgara</label></div>
+    <div class="row"><button id="saveJSON" class="btn">Yedeği dışa aktar</button><label class="no-print" style="display:inline-flex;align-items:center;gap:6px"><input id="loadJSON" type="file" accept="application/json" style="display:none"><button id="loadJSONBtn" class="btn">Yedeği içe aktar</button></label></div>
+    <div class="row"><button id="exportPNG" class="btn">Resim olarak dışa aktar</button><button id="printBtn" class="btn">Yazdır / PDF</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="title">Sınıf Oturma Planı</div>
+      <div class="actions">
+        <input id="meta" class="btn" style="min-width:140px" type="text" placeholder="Tarih">
+        <button id="cloneBtn" class="btn">Seçileni kopyala</button>
+        <button id="lockBtn" class="btn">Seçileni kilitle/aç</button>
+        <button id="deleteBtn" class="btn">Seçileni sil</button>
+        <button id="clearAll" class="btn">Tüm alanı temizle</button>
+      </div>
+    </div>
+
+    <div class="paper-wrap">
+      <div id="paper" class="paper with-grid" tabindex="0" role="region" aria-label="A4 sınıf alanı">
+        <div id="paperHeader" class="header">
+          <img id="logoImg" class="logo" alt="logo" style="display:none" />
+          <div class="meta"><div class="school" id="hdrSchool"></div><div class="class" id="hdrClass"></div><div class="teacher" id="hdrTeacher"></div><div class="date" id="hdrDate"></div></div>
+        </div>
+        <div class="credit no-export">Credits: Can AKALIN</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- Durum ----------
+const state = {version:13, date:'', school:'', klass:'', teacher:'', logo:null, items:{}, order:[], pool:[], snap:true, sel:null, selSlot:null};
+const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
+const paper = $('#paper'); const poolEl = $('#studentPool');
+const GRID=16, HEADER_H=86; const uid=()=> 'i'+Math.random().toString(36).slice(2,9);
+
+/* Depolama */
+function saveLocal(){ const data={...state, date:$('#meta').value, school:$('#schoolName').value, klass:$('#className').value, teacher:$('#teacherName').value}; localStorage.setItem('class-planner-v13', JSON.stringify(data)); }
+function loadLocal(){ const raw=localStorage.getItem('class-planner-v13'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=7){ Object.assign(state,d); $('#meta').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); } }catch(e){} }
+
+/* Yardımcılar */
+function clampToPaper(x,y,w,h){ const r=paper.getBoundingClientRect(); const maxX=r.width - w; const minY=HEADER_H; const maxY=r.height - h; return {x:Math.max(0,Math.min(x,maxX)), y:Math.max(minY,Math.min(y,maxY))}; }
+const snapVal=v=> Math.round(v/GRID)*GRID;
+
+/* Öğeler */
+function makeItem(kind, x=40, y=HEADER_H+20, w=180, h=96, opts={}){
+  const id=uid();
+  const base={id, kind, x, y, w, h, cap:2, slots:['',''], styles:[{bold:true,color:'#111827'},{bold:true,color:'#111827'}], label:(opts.label||'Nesne'), locked:false};
+  if(kind==='object'){ base.w=160; base.h=80; base.cap=0; base.slots=[]; base.styles=[]; }
+  if(kind==='desk' && opts.cap===1){ base.cap=1; base.slots=['']; base.styles=[{bold:true,color:'#111827'}]; base.w=150; base.h=92; }
+  state.items[id]=base; state.order.push(id); return id;
+}
+
+function render(){ paper.querySelectorAll('.item').forEach(n=>n.remove()); state.order.forEach(id=> paper.appendChild(renderItem(state.items[id])) ); highlightSelection(); highlightSlot(); }
+function renderItem(it){
+  const el=document.createElement('div'); el.className='item'; if(it.locked) el.classList.add('locked'); if(state.sel===it.id) el.classList.add('selected'); el.style.left=it.x+'px'; el.style.top=it.y+'px'; el.style.width=it.w+'px'; el.style.height=it.h+'px'; el.dataset.id=it.id;
+  const handle=document.createElement('div'); handle.className='handle'; handle.innerHTML=`<span>☰</span><span class="grow"></span>`; el.appendChild(handle);
+  const res=document.createElement('div'); res.className='resize'; el.appendChild(res);
+
+  if(it.kind==='desk'){
+    const capBtn=document.createElement('button'); capBtn.className='btn'; capBtn.style.padding='2px 8px'; capBtn.textContent = it.cap===1?'1 kişi':'2 kişi'; capBtn.title='Kapasite: 1/2'; capBtn.addEventListener('click',()=>{ setDeskCapacity(it.id, it.cap===1?2:1); }); handle.appendChild(capBtn);
+    const body=document.createElement('div'); body.className='desk-body'; body.addEventListener('dragover',e=>{ if(e.dataTransfer.types.includes('text/student')) e.preventDefault(); }); body.addEventListener('drop',e=>{ if(e.dataTransfer.types.includes('text/student')){ e.preventDefault(); const name=e.dataTransfer.getData('text/student'); placeToDesk(it.id,name); }});
+    const cnt = it.cap===1?1:2; for(let i=0;i<cnt;i++){ body.appendChild(slotNode(it.id,i,it.slots[i]||'')); } el.appendChild(body);
+  } else { const badge=document.createElement('div'); badge.className='badge'; badge.textContent=it.label||'Nesne'; badge.addEventListener('click',()=>{ if(it.locked) return; const inp=document.createElement('input'); inp.type='text'; inp.value=it.label||''; inp.style.fontSize='11px'; inp.style.padding='2px 6px'; inp.style.border='1px solid #e5e7eb'; inp.style.borderRadius='999px'; badge.replaceWith(inp); inp.focus(); inp.select(); const commit=()=>{ it.label=inp.value.trim()||'Nesne'; render(); saveLocal(); }; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') render(); }); inp.addEventListener('blur',commit); }); el.appendChild(badge); }
+
+  enableSelect(el); if(!it.locked){ enableDrag(el, handle); enableResize(el, res); }
+  return el;
+}
+
+function slotNode(itemId, idx, text){ const s=document.createElement('div'); s.className='slot';
+  const it=state.items[itemId]; const st=(it.styles&&it.styles[idx])||{bold:true,color:'#111827'}; s.style.color=st.color||'#111827'; s.style.fontWeight=st.bold? '900':'700';
+  s.textContent=text||'';
+  s.addEventListener('mousedown',()=>{ state.sel=itemId; state.selSlot={itemId, idx}; highlightSelection(); highlightSlot(); syncStylePanel(st); });
+  s.addEventListener('click',()=>{ if(it.locked) return; s.classList.add('editing'); s.innerHTML=''; const inp=document.createElement('input'); inp.type='text'; inp.value=text||''; s.appendChild(inp); inp.focus(); inp.select(); const commit=()=>{ const val=inp.value.trim(); it.slots[idx]=val; state.pool=state.pool.filter(n=> n!==val); renderPool(); render(); saveLocal(); }; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') render(); }); inp.addEventListener('blur',commit); });
+  s.addEventListener('dblclick',()=>{ if(it.locked) return; const name=it.slots[idx]; if(name){ state.pool.push(name); it.slots[idx]=''; renderPool(); render(); saveLocal(); }});
+  return s; }
+function highlightSelection(){ $$('.item').forEach(n=> n.classList.toggle('selected', n.dataset.id===state.sel)); }
+function highlightSlot(){ $$('.slot').forEach(n=> n.classList.remove('sel')); if(state.selSlot){ const {itemId,idx}=state.selSlot; const cont=[...paper.querySelectorAll(`.item[data-id="${itemId}"] .slot`)]; const el=cont[idx]; if(el) el.classList.add('sel'); }}
+function syncStylePanel(st){ if($('#styleColor')) $('#styleColor').value = st?.color||'#111827'; if($('#styleBold')) $('#styleBold').checked = !!st?.bold; }
+
+function setDeskCapacity(id, cap){ const it=state.items[id]; if(it.kind!=='desk') return; it.cap=cap===1?1:2; if(it.cap===1){ if(it.slots[1]){ state.pool.push(it.slots[1]); } it.slots=[it.slots[0]]; it.styles=[it.styles[0]||{bold:true,color:'#111827'}]; } else { if(it.slots.length<2) it.slots[1]=''; if(!it.styles) it.styles=[]; if(!it.styles[0]) it.styles[0]={bold:true,color:'#111827'}; if(!it.styles[1]) it.styles[1]={bold:true,color:'#111827'}; }
+  renderPool(); render(); saveLocal(); }
+function placeToDesk(id,name){ const it=state.items[id]; const cnt=it.cap===1?1:2; const idx=it.slots.slice(0,cnt).findIndex(v=>!v); if(idx>-1){ it.slots[idx]=name; } else { const old=it.slots[0]; if(old) state.pool.push(old); it.slots[0]=name; } state.pool=state.pool.filter(n=>n!==name); renderPool(); render(); saveLocal(); }
+
+/* Sürükleme & boyutlandırma */
+function enableSelect(el){ el.addEventListener('mousedown',()=>{ state.sel=el.dataset.id; highlightSelection(); }); }
+function currentItem(){ return state.items[state.sel||''] || null; }
+function enableDrag(el, handle){ let sx=0, sy=0, ox=0, oy=0, id=el.dataset.id; handle.addEventListener('mousedown',down); function down(e){ e.preventDefault(); state.sel=id; highlightSelection(); sx=e.clientX; sy=e.clientY; const it=state.items[id]; ox=it.x; oy=it.y; document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);} function move(e){ const it=state.items[id]; let nx=ox + (e.clientX-sx); let ny=oy + (e.clientY-sy); if(state.snap){ nx=snapVal(nx); ny=snapVal(ny); } const cl=clampToPaper(nx,ny,it.w,it.h); it.x=cl.x; it.y=cl.y; el.style.left=it.x+'px'; el.style.top=it.y+'px'; } function up(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); saveLocal(); } }
+function enableResize(el, grip){ let sx=0, sy=0, sw=0, sh=0, id=el.dataset.id; grip.addEventListener('mousedown',down); function down(e){ e.preventDefault(); sx=e.clientX; sy=e.clientY; const it=state.items[id]; sw=it.w; sh=it.h; document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);} function move(e){ const it=state.items[id]; let nw=sw + (e.clientX - sx); let nh=sh + (e.clientY - sy); if(it.kind==='desk'){ nw=Math.max(it.cap===1?140:160,nw); nh=Math.max(92,nh);} else { nw=Math.max(60,nw); nh=Math.max(50,nh);} if(state.snap){ nw=Math.max(60,snapVal(nw)); nh=Math.max(50,snapVal(nh)); } const cl=clampToPaper(it.x,it.y,nw,nh); it.w=Math.min(nw, paper.getBoundingClientRect().width-it.x); it.h=Math.min(nh, paper.getBoundingClientRect().height-it.y); el.style.width=it.w+'px'; el.style.height=it.h+'px'; } function up(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); saveLocal(); } }
+
+/* Havuz */
+function renderPool(){ poolEl.innerHTML=''; state.pool.forEach(n=> poolEl.appendChild(pill(n)) ); }
+function pill(name){ const el=document.createElement('div'); el.className='pill'; el.textContent=name; el.draggable=true; el.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('text/student', name); ev.dataTransfer.effectAllowed='move'; }); return el; }
+$('#loadNames').addEventListener('click',()=>{ const txt=$('#names').value.trim(); const items = txt.split(/\n+/).map(s=>s.trim()).filter(Boolean); const placed=new Set(Object.values(state.items).flatMap(it=>it.slots||[])); const poolSet = new Set(state.pool); const add=items.filter(n=>!placed.has(n)&&!poolSet.has(n)); state.pool.push(...add); renderPool(); saveLocal(); });
+$('#clearNames').addEventListener('click',()=>{ state.pool=[]; renderPool(); saveLocal(); });
+
+/* Başlık/Logo */
+function refreshHeader(){ $('#hdrSchool').textContent = state.school||''; $('#hdrClass').textContent = state.klass||''; $('#hdrTeacher').textContent = state.teacher?('Sınıf Öğretmeni: '+state.teacher):''; $('#hdrDate').textContent = state.date||''; }
+function setLogo(dataUrl){ const img=$('#logoImg'); state.logo=dataUrl; if(dataUrl){ img.src=dataUrl; img.style.display='block'; } else { img.removeAttribute('src'); img.style.display='none'; } }
+$('#schoolName').addEventListener('input',()=>{ state.school=$('#schoolName').value; refreshHeader(); saveLocal(); });
+$('#className').addEventListener('input',()=>{ state.klass=$('#className').value; refreshHeader(); saveLocal(); });
+$('#teacherName').addEventListener('input',()=>{ state.teacher=$('#teacherName').value; refreshHeader(); saveLocal(); });
+$('#meta').addEventListener('input',()=>{ state.date=$('#meta').value; refreshHeader(); saveLocal(); });
+$('#logoBtn').addEventListener('click',()=> $('#logoInput').click());
+$('#logoInput').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ setLogo(rd.result); saveLocal(); }; rd.readAsDataURL(f); });
+$('#logoClear').addEventListener('click',()=>{ setLogo(null); saveLocal(); });
+
+/* Ekle butonları */
+$('#addDesk').addEventListener('click',()=>{ const cap = +$('#deskCap').value||2; makeItem('desk', 40, HEADER_H+20, cap===1?150:180, 96, {cap}); render(); saveLocal(); });
+$('#addObject').addEventListener('click',()=>{ const name=$('#objName').value.trim()||'Nesne'; makeItem('object', 60, HEADER_H+20, 160, 80, {label:name}); render(); saveLocal(); });
+
+/* Seçileni işle */
+$('#cloneBtn').addEventListener('click',()=>{ const it=currentItem(); if(!it) return; const id=makeItem(it.kind, it.x+24, it.y+24, it.w, it.h, {label:it.label, cap:it.cap}); const n=state.items[id]; if(it.kind==='desk'){ n.cap=it.cap; n.slots=[...it.slots]; n.styles=it.styles.map(o=>({...o})); } n.locked=it.locked; render(); saveLocal(); });
+$('#deleteBtn').addEventListener('click',()=>{ const it=currentItem(); if(!it) return; delete state.items[it.id]; state.order=state.order.filter(x=>x!==it.id); state.sel=null; state.selSlot=null; render(); saveLocal(); });
+$('#lockBtn').addEventListener('click',()=>{ const it=currentItem(); if(!it) return; it.locked=!it.locked; render(); saveLocal(); });
+
+/* Yedek, Resim, Yazdır, toggles */
+$('#clearAll').addEventListener('click',()=>{ state.items={}; state.order=[]; state.sel=null; state.selSlot=null; render(); saveLocal(); });
+$('#snapToggle').addEventListener('change',e=>{ state.snap = e.target.checked; saveLocal(); });
+$('#gridToggle').addEventListener('change',e=>{ paper.classList.toggle('with-grid', e.target.checked); });
+$('#saveJSON').addEventListener('click',()=>{ const payload={...state}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href); });
+$('#loadJSONBtn').addEventListener('click',()=> $('#loadJSON').click());
+$('#loadJSON').addEventListener('change',ev=>{ const file=ev.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(reader.result); if(data.version>=7){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#meta').value=state.date||''; $('#snapToggle').checked=!!state.snap; paper.classList.toggle('with-grid', $('#gridToggle').checked); setLogo(state.logo||null); refreshHeader(); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); }}; reader.readAsText(file); });
+$('#printBtn').addEventListener('click', printPaper);
+$('#exportPNG').addEventListener('click', exportPNG);
+
+// Stil uygula
+$('#applyStyle').addEventListener('click',()=>{ if(!state.selSlot) return; const {itemId, idx}=state.selSlot; const it=state.items[itemId]; if(!it) return; if(!it.styles) it.styles=[]; it.styles[idx]={ color: $('#styleColor').value, bold: $('#styleBold').checked }; render(); saveLocal(); highlightSlot(); });
+$('#applyStyleDesk').addEventListener('click',()=>{ const it=currentItem(); if(!it || it.kind!=='desk') return; const val={ color: $('#styleColor').value, bold: $('#styleBold').checked }; const cnt = it.cap===1?1:2; it.styles = Array.from({length:cnt}, ()=> ({...val})); render(); saveLocal(); highlightSlot(); });
+
+/* Resim olarak dışa aktar */
+async function exportPNG(){
+  const hadGrid = paper.classList.contains('with-grid');
+  paper.classList.add('exporting'); paper.classList.remove('with-grid');
+  if(!window.html2canvas){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }).catch(()=>{}); }
+  try{ if(!window.html2canvas) throw new Error('html2canvas yüklenemedi'); const r = paper.getBoundingClientRect(); const canvas = await window.html2canvas(paper,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:Math.round(r.width),height:Math.round(r.height)}); const png = canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=png; a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.png`; a.click(); } catch(e){ alert('Resim dışa aktarım başarısız oldu.'); } finally { if(hadGrid) paper.classList.add('with-grid'); paper.classList.remove('exporting'); }
+}
+
+/* Yazdır (yeni pencerede) */
+function printPaper(){
+  const wasGrid = paper.classList.contains('with-grid');
+  paper.classList.remove('with-grid');
+  const css = `
+    *{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0}
+    .paper{position:relative;background:#fff;border:0;width:190mm;height:277mm;overflow:hidden}
+    .header{position:absolute;left:0;top:0;right:0;height:86px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;padding:12px 16px;color:#111827}
+    .header .logo{max-width:160px;max-height:64px;object-fit:contain}
+    .header .school{font-weight:800;font-size:16px}
+    .header .class{font-weight:700;color:#334155}
+    .header .teacher{font-weight:700;color:#475569}
+    .header .date{font-size:12px;color:#64748b}
+    .item{position:absolute;background:#fff;border:2px solid #cbd5e1;border-radius:12px;min-width:60px;min-height:40px}
+    .desk-body{position:absolute;left:10px;right:10px;top:30px;bottom:10px;display:flex;gap:8px}
+    .slot{flex:1;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px;text-align:center;font-weight:800;min-height:30px}
+    .badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;padding:2px 8px;border:1px solid #e5e7eb;background:#eef2ff;color:#334155}
+    .credit{display:none}
+    @page{size:A4;margin:10mm}
+  `;
+  const html = `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Yazdır</title><style>${css}</style></head><body>${paper.outerHTML}</body></html>`;
+  const win = window.open('', '_blank');
+  win.document.open(); win.document.write(html); win.document.close();
+  win.focus();
+  setTimeout(()=>{ win.print(); if(wasGrid) paper.classList.add('with-grid'); win.close(); }, 300);
+}
+
+/* Başlat */
+loadLocal();
+if(Object.keys(state.items).length===0){
+  setLogo(null); state.school='Okul Adı'; state.klass='9-B'; state.teacher=''; state.date=new Date().toLocaleDateString('tr-TR'); refreshHeader();
+  makeItem('object', 80, HEADER_H+12, 520, 28, {label:'Tahta'});
+  makeItem('desk', 80, HEADER_H+110, 190, 96, {cap:2});
+  makeItem('desk', 300, HEADER_H+110, 150, 96, {cap:1});
+}
+render(); renderPool();
+</script>
+</body>
+</html>
