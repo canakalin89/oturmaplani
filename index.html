@@ -170,6 +170,10 @@
           <button id="cloneItemBtn" class="btn" style="flex:1">Klonla (Ctrl+D)</button>
           <button id="lockItemBtn" class="btn" style="flex:1">Kilitle (L)</button>
         </div>
+        <div class="row" style="margin-top: 8px;">
+          <button id="sendToBackBtn" class="btn" style="flex:1">Arkaya Gönder</button>
+          <button id="bringToFrontBtn" class="btn" style="flex:1">Öne Getir</button>
+        </div>
         <div class="divider"></div>
       </div>
 
@@ -407,6 +411,24 @@
       highlightSelection(); // Düğme metnini ve stilleri güncellemek için
       saveLocal();
     }
+    
+    function bringToFront() {
+        const it = currentItem();
+        if (!it) return;
+        state.order = state.order.filter(id => id !== it.id);
+        state.order.push(it.id);
+        render();
+        saveLocal();
+    }
+
+    function sendToBack() {
+        const it = currentItem();
+        if (!it) return;
+        state.order = state.order.filter(id => id !== it.id);
+        state.order.unshift(it.id);
+        render();
+        saveLocal();
+    }
 
     // ======= Seçim / Sürükleme / Boyutlandırma =======
     function enableSelect(el){ 
@@ -473,6 +495,8 @@
 
     $('#cloneItemBtn').addEventListener('click', cloneSelectedItem);
     $('#lockItemBtn').addEventListener('click', toggleLockSelectedItem);
+    $('#bringToFrontBtn').addEventListener('click', bringToFront);
+    $('#sendToBackBtn').addEventListener('click', sendToBack);
 
     // ======= Sıra Görünümü Kontrolleri =======
     $('#photoSize').addEventListener('input', e => { const size = e.target.value; state.photoSize = parseInt(size); $('#photoSizeVal').textContent = size; render(); });
@@ -535,7 +559,7 @@
     });
 
     // ======= Çekmece (aynı panel) =======
-    const scrim=$('#scrim');
+    const scrim=$$('#scrim');
     $('#btnTools').addEventListener('click',()=>{ document.body.classList.add('drawer-open'); scrim.addEventListener('click',closeDrawer,{once:true}); });
     function closeDrawer(){ document.body.classList.remove('drawer-open'); }
 
