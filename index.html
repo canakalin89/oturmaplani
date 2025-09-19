@@ -49,7 +49,16 @@
 
     /* Öğrenci havuzu */
     .students{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-    .pill{border:1px solid var(--line);padding:8px 12px;border-radius:999px;background:var(--chip);cursor:grab;user-select:none}
+    .pill{border:1px solid var(--line);padding:8px 12px;border-radius:999px;background:var(--chip);cursor:grab;user-select:none;display:flex;align-items:center;gap:10px;min-width:0}
+    .student-photo-wrap{width:32px;height:32px;border-radius:50%;overflow:hidden;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--muted);flex-shrink:0}
+    .student-photo-wrap::after{content:attr(data-initial)}
+    .student-photo-wrap.has-photo::after{content:""}
+    .student-photo-wrap img{width:100%;height:100%;object-fit:cover;display:none}
+    .student-photo-wrap.has-photo img{display:block}
+    .student-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;flex:1;min-width:0}
+    .student-upload{margin-left:auto;padding:4px 10px;font-size:11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);cursor:pointer;flex-shrink:0}
+    .student-upload:hover{color:var(--ink);background:var(--paper)}
+    .student-upload:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
     /* Tuval alanı */
     .stage{display:flex;flex-direction:column;gap:12px}
@@ -77,7 +86,13 @@
     .resize{position:absolute;width:16px;height:16px;right:-8px;bottom:-8px;border:2px solid var(--accent);background:var(--surface);border-radius:6px;cursor:nwse-resize}
 
     .desk-body{position:absolute;inset:40px 10px 10px 10px;display:flex;gap:8px}
-    .slot{flex:1;border:1px dashed var(--line);background:var(--paper);border-radius:10px;padding:10px;text-align:center;font-weight:800;min-height:36px}
+    .slot{flex:1;border:1px dashed var(--line);background:var(--paper);border-radius:10px;padding:10px;text-align:center;font-weight:800;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+    .slot-name{font-weight:inherit;word-break:break-word}
+    .slot-photo-wrap{width:48px;height:48px;border-radius:50%;overflow:hidden;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--muted);flex-shrink:0}
+    .slot-photo-wrap::after{content:attr(data-initial)}
+    .slot-photo-wrap.has-photo::after{content:""}
+    .slot-photo{width:100%;height:100%;object-fit:cover;display:none}
+    .slot-photo-wrap.has-photo .slot-photo{display:block}
     .slot.editing input{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;font-size:14px;background:var(--paper);color:var(--ink)}
     .slot.sel{outline:2px solid var(--accent); outline-offset:2px}
 
@@ -176,10 +191,53 @@
 
   <script>
     // ======= Durum =======
-    const state={version:60,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, theme:'system'};
+    const state={version:61,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, theme:'system'};
     const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
     const paper=$('#paper'), poolEl=$('#studentPool');
     const GRID=16, HEADER_H=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--headerH'))||88; const uid=()=> 'i'+Math.random().toString(36).slice(2,9);
+    const STORAGE_KEY='planner-v60';
+    const DEFAULT_STYLE={bold:true,color:'#111827'};
+
+    function createEmptyStudent(){ return {name:'', photo:null}; }
+    function ensureStudent(raw){
+      if(!raw) return createEmptyStudent();
+      if(typeof raw==='string') return {name:raw.trim(), photo:null};
+      if(typeof raw==='object'){ return {name:((raw.name??'').toString()).trim(), photo:raw.photo||null}; }
+      return {name:String(raw).trim(), photo:null};
+    }
+    function cloneStudent(raw){ const st=ensureStudent(raw); return {name:st.name, photo:st.photo}; }
+    function studentsEqual(a,b){ const aa=ensureStudent(a), bb=ensureStudent(b); return aa.name===bb.name && (aa.photo||null)===(bb.photo||null); }
+    function removeStudentFromPool(student){
+      const idx=state.pool.findIndex(st=> studentsEqual(st, student));
+      if(idx>-1){ state.pool.splice(idx,1); return; }
+      if(student?.name){ const fallback=state.pool.findIndex(st=> st.name===student.name); if(fallback>-1) state.pool.splice(fallback,1); }
+    }
+    function removeStudentsByName(name){ state.pool=state.pool.filter(st=> st.name!==name); }
+    function studentInitial(name){ const str=(name||'').trim(); return str?str[0].toUpperCase():'?'; }
+    function normalizeState(){
+      state.pool=(state.pool||[]).map(ensureStudent).filter(st=> st.name);
+      Object.values(state.items||{}).forEach(it=>{
+        if(it.kind==='desk'){
+          it.slots=(it.slots||[]).map(ensureStudent);
+          const cap=it.cap===1?1:2;
+          it.slots=it.slots.slice(0,cap);
+          while(it.slots.length<cap){ it.slots.push(createEmptyStudent()); }
+          if(!it.styles) it.styles=[];
+          if(!it.styles[0]) it.styles[0]={...DEFAULT_STYLE};
+          if(cap>1 && !it.styles[1]) it.styles[1]={...DEFAULT_STYLE};
+        }
+      });
+      state.version=61;
+    }
+    function parseStudentPayload(payload){
+      if(!payload && payload!==0) return createEmptyStudent();
+      if(typeof payload==='object' && payload!==null && 'name' in payload) return ensureStudent(payload);
+      try{
+        return ensureStudent(JSON.parse(payload));
+      }catch(e){
+        return ensureStudent(payload);
+      }
+    }
 
     // ======= Tema =======
     function applyTheme(mode){ document.documentElement.setAttribute('data-theme', mode); state.theme=mode; [...$('#themeSeg').children].forEach(b=> b.classList.toggle('active', b.dataset.mode===mode)); saveLocal(); }
@@ -188,8 +246,29 @@
     const mediaDark=window.matchMedia('(prefers-color-scheme: dark)'); mediaDark.addEventListener?.('change',()=>{ if(state.theme==='system') applyTheme('system'); });
 
     // ======= Depolama =======
-    function saveLocal(){ const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value}; localStorage.setItem('planner-v60', JSON.stringify(data)); }
-    function loadLocal(){ const raw=localStorage.getItem('planner-v60'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=7){ Object.assign(state,d); $('#dateInput').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); applyTheme(d.theme||'system'); } }catch(e){}
+    function saveLocal(){
+      normalizeState();
+      const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value};
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+    function loadLocal(){
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      try{
+        const d=JSON.parse(raw);
+        if(d?.version>=7){
+          Object.assign(state,d);
+          normalizeState();
+          $('#dateInput').value=state.date||'';
+          $('#schoolName').value=state.school||'';
+          $('#className').value=state.klass||'';
+          $('#teacherName').value=state.teacher||'';
+          $('#snapToggle').checked=!!state.snap;
+          setLogo(state.logo||null);
+          refreshHeader();
+          applyTheme(state.theme||'system');
+        }
+      }catch(e){}
     }
 
     // ======= Başlık =======
@@ -204,9 +283,9 @@
     // ======= Öğeler =======
     function makeItem(kind,x=40,y=HEADER_H+20,w=200,h=110,opts={}){
       const id=uid();
-      const base={id,kind,x,y,w,h,cap:2,slots:['',''],styles:[{bold:true,color:'#111827'},{bold:true,color:'#111827'}],label:(opts.label||'Nesne'),locked:false};
+      const base={id,kind,x,y,w,h,cap:2,slots:[createEmptyStudent(),createEmptyStudent()],styles:[{...DEFAULT_STYLE},{...DEFAULT_STYLE}],label:(opts.label||'Nesne'),locked:false};
       if(kind==='object'){ base.w=170;base.h=90;base.cap=0;base.slots=[];base.styles=[]; }
-      if(kind==='desk' && opts.cap===1){ base.cap=1;base.slots=[''];base.styles=[{bold:true,color:'#111827'}];base.w=170;base.h=104; }
+      if(kind==='desk' && opts.cap===1){ base.cap=1;base.slots=[createEmptyStudent()];base.styles=[{...DEFAULT_STYLE}];base.w=170;base.h=104; }
       state.items[id]=base; state.order.push(id); return id;
     }
     function render(){ paper.querySelectorAll('.item').forEach(n=>n.remove()); state.order.forEach(id=> paper.appendChild(renderItem(state.items[id])) ); highlightSelection(); highlightSlot(); }
@@ -216,18 +295,90 @@
       const res=document.createElement('div'); res.className='resize'; el.appendChild(res);
       if(it.kind==='desk'){
         const capBtn=document.createElement('button'); capBtn.className='btn'; capBtn.style.padding='6px 10px'; capBtn.textContent= it.cap===1?'1 kişi':'2 kişi'; capBtn.title='Kapasite: 1/2'; capBtn.addEventListener('click',()=> setDeskCapacity(it.id,it.cap===1?2:1)); handle.appendChild(capBtn);
-        const body=document.createElement('div'); body.className='desk-body'; body.addEventListener('dragover',e=>{ if(e.dataTransfer?.types?.includes('text/student')) e.preventDefault(); }); body.addEventListener('drop',e=>{ if(e.dataTransfer?.types?.includes('text/student')){ e.preventDefault(); placeToDesk(it.id, e.dataTransfer.getData('text/student')); }});
-        const cnt=it.cap===1?1:2; for(let i=0;i<cnt;i++){ body.appendChild(slotNode(it.id,i,it.slots[i]||'')); } el.appendChild(body);
+        const body=document.createElement('div'); body.className='desk-body'; body.addEventListener('dragover',e=>{ if(e.dataTransfer?.types?.includes('text/student')) e.preventDefault(); }); body.addEventListener('drop',e=>{ if(e.dataTransfer?.types?.includes('text/student')){ e.preventDefault(); const payload=e.dataTransfer.getData('text/student'); const idxRaw=e.dataTransfer.getData('text/student-index'); let fromIndex=null; if(idxRaw!=='' && idxRaw!=null){ const parsed=Number(idxRaw); if(Number.isInteger(parsed)) fromIndex=parsed; } placeToDesk(it.id,payload,fromIndex); }});
+        const cnt=it.cap===1?1:2; for(let i=0;i<cnt;i++){ body.appendChild(slotNode(it.id,i)); } el.appendChild(body);
       } else { const badge=document.createElement('div'); badge.className='badge'; badge.textContent=it.label||'Nesne'; badge.addEventListener('click',()=>{ if(it.locked) return; const inp=document.createElement('input'); inp.type='text'; inp.value=it.label||''; Object.assign(inp.style,{fontSize:'12px',padding:'4px 8px',border:'1px solid var(--line)',borderRadius:'999px',background:'var(--paper)',color:'var(--ink)'}); badge.replaceWith(inp); inp.focus(); inp.select(); const commit=()=>{ it.label=inp.value.trim()||'Nesne'; render(); saveLocal(); }; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') render(); }); inp.addEventListener('blur',commit); }); el.appendChild(badge); }
       enableSelect(el); if(!it.locked){ enableDrag(el,handle); enableResize(el,res); }
       return el;
     }
-    function slotNode(itemId,idx,text){ const s=document.createElement('div'); s.className='slot'; const it=state.items[itemId]; const st=(it.styles&&it.styles[idx])||{bold:true,color:'#111827'}; s.style.color=st.color||'#111827'; s.style.fontWeight=st.bold?'900':'700'; s.textContent=text||''; s.addEventListener('mousedown',()=>{ state.sel=itemId; state.selSlot={itemId,idx}; highlightSelection(); highlightSlot(); syncStylePanel(st); }); s.addEventListener('touchstart',()=>{ state.sel=itemId; state.selSlot={itemId,idx}; highlightSelection(); highlightSlot(); syncStylePanel(st); },{passive:true}); s.addEventListener('click',()=>{ if(it.locked) return; s.classList.add('editing'); s.innerHTML=''; const inp=document.createElement('input'); inp.type='text'; inp.value=text||''; s.appendChild(inp); inp.focus(); inp.select(); const commit=()=>{ const val=inp.value.trim(); it.slots[idx]=val; state.pool=state.pool.filter(n=> n!==val); renderPool(); render(); saveLocal(); }; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') render(); }); inp.addEventListener('blur',commit); }); s.addEventListener('dblclick',()=>{ if(it.locked) return; const name=it.slots[idx]; if(name){ state.pool.push(name); it.slots[idx]=''; renderPool(); render(); saveLocal(); }}); return s; }
+    function slotNode(itemId,idx){
+      const s=document.createElement('div'); s.className='slot';
+      const it=state.items[itemId];
+      const st=(it.styles&&it.styles[idx])||DEFAULT_STYLE;
+      const student=ensureStudent(it.slots[idx]);
+      it.slots[idx]=student;
+      s.style.color=st.color||'#111827';
+      s.style.fontWeight=st.bold?'900':'700';
+      const nameEl=document.createElement('div'); nameEl.className='slot-name'; nameEl.textContent=student.name||''; if(student.name) nameEl.title=student.name;
+      const photoWrap=document.createElement('div'); photoWrap.className='slot-photo-wrap'; photoWrap.dataset.initial=studentInitial(student.name);
+      const img=document.createElement('img'); img.className='slot-photo'; img.alt=student.name?`${student.name} fotoğrafı`:'Öğrenci fotoğrafı';
+      if(student.photo){ img.src=student.photo; photoWrap.classList.add('has-photo'); }
+      photoWrap.appendChild(img);
+      s.appendChild(nameEl);
+      s.appendChild(photoWrap);
+      const selectSlot=()=>{ state.sel=itemId; state.selSlot={itemId,idx}; highlightSelection(); highlightSlot(); syncStylePanel(st); };
+      s.addEventListener('mousedown',selectSlot);
+      s.addEventListener('touchstart',selectSlot,{passive:true});
+      s.addEventListener('click',()=>{ if(it.locked) return; s.classList.add('editing'); s.innerHTML=''; const inp=document.createElement('input'); inp.type='text'; inp.value=student.name||''; s.appendChild(inp); inp.focus(); inp.select(); const commit=()=>{ const val=inp.value.trim(); const current=ensureStudent(it.slots[idx]); current.name=val; if(!val || val!==student.name) current.photo=null; it.slots[idx]=current; if(val) removeStudentsByName(val); renderPool(); render(); saveLocal(); }; inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') render(); }); inp.addEventListener('blur',commit); });
+      s.addEventListener('dblclick',()=>{ if(it.locked) return; const current=ensureStudent(it.slots[idx]); if(current.name){ state.pool.push(cloneStudent(current)); it.slots[idx]=createEmptyStudent(); renderPool(); render(); saveLocal(); }});
+      return s;
+    }
     function highlightSelection(){ $$('.item').forEach(n=> n.classList.toggle('selected', n.dataset.id===state.sel)); }
     function highlightSlot(){ $$('.slot').forEach(n=> n.classList.remove('sel')); if(state.selSlot){ const {itemId,idx}=state.selSlot; const cont=[...paper.querySelectorAll(`.item[data-id="${itemId}"] .slot`)]; const el=cont[idx]; if(el) el.classList.add('sel'); }}
     function syncStylePanel(st){ $('#styleColor').value = st?.color||'#111827'; $('#styleBold').checked = !!st?.bold; }
-    function setDeskCapacity(id,cap){ const it=state.items[id]; if(it.kind!=='desk') return; it.cap=cap===1?1:2; if(it.cap===1){ if(it.slots[1]) state.pool.push(it.slots[1]); it.slots=[it.slots[0]]; it.styles=[it.styles[0]||{bold:true,color:'#111827'}]; } else { if(it.slots.length<2) it.slots[1]=''; if(!it.styles) it.styles=[]; if(!it.styles[0]) it.styles[0]={bold:true,color:'#111827'}; if(!it.styles[1]) it.styles[1]={bold:true,color:'#111827'}; } renderPool(); render(); saveLocal(); }
-    function placeToDesk(id,name){ const it=state.items[id]; const cnt=it.cap===1?1:2; const idx=it.slots.slice(0,cnt).findIndex(v=>!v); if(idx>-1){ it.slots[idx]=name; } else { const old=it.slots[0]; if(old) state.pool.push(old); it.slots[0]=name; } state.pool=state.pool.filter(n=>n!==name); renderPool(); render(); saveLocal(); }
+    function setDeskCapacity(id,cap){
+      const it=state.items[id];
+      if(it.kind!=='desk') return;
+      const newCap=cap===1?1:2;
+      it.cap=newCap;
+      it.slots=(it.slots||[]).map(ensureStudent);
+      if(newCap===1){
+        const extra=it.slots[1];
+        if(extra && ensureStudent(extra).name) state.pool.push(cloneStudent(extra));
+        const first=ensureStudent(it.slots[0]);
+        it.slots=[first];
+        it.styles=[(it.styles?.[0])||{...DEFAULT_STYLE}];
+      } else {
+        const first=ensureStudent(it.slots[0]);
+        const second=ensureStudent(it.slots[1]||createEmptyStudent());
+        it.slots=[first,second];
+        if(!it.styles) it.styles=[];
+        if(!it.styles[0]) it.styles[0]={...DEFAULT_STYLE};
+        if(!it.styles[1]) it.styles[1]={...DEFAULT_STYLE};
+      }
+      renderPool();
+      render();
+      saveLocal();
+    }
+    function placeToDesk(id,payload,fromIndex){
+      const it=state.items[id];
+      if(!it || it.kind!=='desk') return;
+      const cnt=it.cap===1?1:2;
+      const student=parseStudentPayload(payload);
+      if(!student.name) return;
+      let idx=-1;
+      for(let i=0;i<cnt;i++){
+        const existing=ensureStudent(it.slots[i]);
+        it.slots[i]=existing;
+        if(idx===-1 && !existing.name) idx=i;
+      }
+      let removed=false;
+      if(Number.isInteger(fromIndex) && fromIndex>=0 && fromIndex<state.pool.length && studentsEqual(state.pool[fromIndex], student)){
+        state.pool.splice(fromIndex,1);
+        removed=true;
+      }
+      if(!removed) removeStudentFromPool(student);
+      if(idx>-1){
+        it.slots[idx]=student;
+      } else {
+        const old=ensureStudent(it.slots[0]);
+        if(old.name) state.pool.push(cloneStudent(old));
+        it.slots[0]=student;
+      }
+      renderPool();
+      render();
+      saveLocal();
+    }
 
     // ======= Seçim / Sürükleme / Boyutlandırma =======
     function enableSelect(el){ el.addEventListener('mousedown',()=>{ state.sel=el.dataset.id; highlightSelection(); }); el.addEventListener('touchstart',()=>{ state.sel=el.dataset.id; highlightSelection(); },{passive:true}); }
@@ -236,9 +387,62 @@
     function enableResize(el,grip){ let sx=0,sy=0,sw=0,sh=0,id=el.dataset.id; grip.addEventListener('mousedown',down); grip.addEventListener('touchstart',down,{passive:false}); function down(e){ e.preventDefault(); const p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; const it=state.items[id]; sw=it.w; sh=it.h; document.addEventListener('mousemove',move); document.addEventListener('mouseup',up); document.addEventListener('touchmove',move,{passive:false}); document.addEventListener('touchend',up);} function move(e){ const p=e.touches?e.touches[0]:e; const it=state.items[id]; let nw=sw+(p.clientX-sx); let nh=sh+(p.clientY-sy); if(it.kind==='desk'){ nw=Math.max(it.cap===1?150:180,nw); nh=Math.max(100,nh);} else { nw=Math.max(60,nw); nh=Math.max(50,nh);} if(state.snap){ nw=Math.max(60,snapVal(nw)); nh=Math.max(50,snapVal(nh)); } const r=paper.getBoundingClientRect(); it.w=Math.min(nw, r.width-it.x); it.h=Math.min(nh, r.height-it.y); el.style.width=it.w+'px'; el.style.height=it.h+'px'; } function up(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); document.removeEventListener('touchmove',move); document.removeEventListener('touchend',up); saveLocal(); } }
 
     // ======= Havuz =======
-    function renderPool(){ poolEl.innerHTML=''; state.pool.forEach(n=> poolEl.appendChild(pill(n)) ); }
-    function pill(name){ const el=document.createElement('div'); el.className='pill'; el.textContent=name; el.draggable=true; el.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('text/student', name); ev.dataTransfer.effectAllowed='move'; }); return el; }
-    $('#loadNames').addEventListener('click',()=>{ const txt=$('#names').value.trim(); const items=txt.split(/\n+/).map(s=>s.trim()).filter(Boolean); const placed=new Set(Object.values(state.items).flatMap(it=>it.slots||[])); const poolSet=new Set(state.pool); const add=items.filter(n=>!placed.has(n)&&!poolSet.has(n)); state.pool.push(...add); renderPool(); saveLocal(); });
+    function renderPool(){
+      poolEl.innerHTML='';
+      state.pool.forEach((student,idx)=> poolEl.appendChild(poolStudent(student,idx)));
+    }
+    function poolStudent(student,idx){
+      const data=ensureStudent(student);
+      state.pool[idx]=data;
+      const el=document.createElement('div');
+      el.className='pill';
+      el.draggable=true;
+      el.dataset.index=idx;
+      const photoWrap=document.createElement('div'); photoWrap.className='student-photo-wrap'; photoWrap.dataset.initial=studentInitial(data.name);
+      const img=document.createElement('img'); img.alt=data.name?`${data.name} fotoğrafı`:'Öğrenci fotoğrafı'; if(data.photo){ img.src=data.photo; photoWrap.classList.add('has-photo'); }
+      photoWrap.appendChild(img);
+      const nameEl=document.createElement('span'); nameEl.className='student-name'; nameEl.textContent=data.name; if(data.name) nameEl.title=data.name;
+      const uploadBtn=document.createElement('button'); uploadBtn.type='button'; uploadBtn.className='student-upload'; uploadBtn.textContent='Fotoğraf yükle'; uploadBtn.setAttribute('aria-label', (data.name?`${data.name} için fotoğraf yükle`:'Fotoğraf yükle'));
+      const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.style.display='none'; input.addEventListener('click',ev=>ev.stopPropagation());
+      uploadBtn.addEventListener('click',ev=>{ ev.stopPropagation(); input.click(); });
+      uploadBtn.addEventListener('mousedown',ev=>ev.stopPropagation());
+      uploadBtn.addEventListener('touchstart',ev=>ev.stopPropagation(),{passive:true});
+      input.addEventListener('change',ev=>{
+        const file=ev.target.files?.[0];
+        if(!file) return;
+        const reader=new FileReader();
+        reader.onload=()=>{
+          const result=typeof reader.result==='string'?reader.result:null;
+          state.pool[idx]={...data, photo:result};
+          renderPool();
+          render();
+          saveLocal();
+        };
+        reader.readAsDataURL(file);
+        input.value='';
+      });
+      el.addEventListener('dragstart',ev=>{
+        ev.dataTransfer.setData('text/student', JSON.stringify(data));
+        ev.dataTransfer.setData('text/student-index', String(idx));
+        if(data.name) ev.dataTransfer.setData('text/plain', data.name);
+        ev.dataTransfer.effectAllowed='move';
+      });
+      el.appendChild(photoWrap);
+      el.appendChild(nameEl);
+      el.appendChild(uploadBtn);
+      el.appendChild(input);
+      return el;
+    }
+    $('#loadNames').addEventListener('click',()=>{
+      const txt=$('#names').value.trim();
+      const items=txt.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      const placed=new Set(Object.values(state.items).flatMap(it=> (it.slots||[]).map(st=> ensureStudent(st).name).filter(Boolean)));
+      const poolSet=new Set(state.pool.map(st=> st.name));
+      const add=items.filter(n=> !placed.has(n) && !poolSet.has(n));
+      state.pool.push(...add.map(name=>({name, photo:null})));
+      renderPool();
+      saveLocal();
+    });
     $('#clearNames').addEventListener('click',()=>{ state.pool=[]; renderPool(); saveLocal(); });
 
     // ======= Girişler =======
@@ -261,12 +465,12 @@
     // ======= Araç çubuğu =======
     $('#btnPrint').addEventListener('click', printPaper);
     $('#btnExport').addEventListener('click', exportPNG);
-    $('#btnBackup').addEventListener('click',()=>{ const payload={...state}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href); });
+    $('#btnBackup').addEventListener('click',()=>{ normalizeState(); const payload={...state}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href); });
     $('#btnRestore').addEventListener('click',()=> hiddenInput.click());
 
     // Gizli dosya inputu
     const hiddenInput=document.createElement('input'); hiddenInput.type='file'; hiddenInput.accept='application/json'; hiddenInput.style.display='none'; document.body.appendChild(hiddenInput);
-    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=7){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); applyTheme(state.theme||'system'); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
+    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=7){ Object.assign(state,data); normalizeState(); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); applyTheme(state.theme||'system'); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
 
     // ======= Toggle'lar =======
     $('#snapToggle').addEventListener('change',e=>{ state.snap=e.target.checked; saveLocal(); });
@@ -275,7 +479,7 @@
     // ======= Klavye =======
     document.addEventListener('keydown',e=>{ const it=currentItem(); if(!it) return; if(e.key==='Delete' || e.key==='Backspace'){ delete state.items[it.id]; state.order=state.order.filter(x=>x!==it.id); state.sel=null; state.selSlot=null; render(); saveLocal(); }
       if(e.key==='l'){ it.locked=!it.locked; render(); saveLocal(); }
-      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='d'){ const id=makeItem(it.kind,it.x+24,it.y+24,it.w,it.h,{label:it.label,cap:it.cap}); const n=state.items[id]; if(it.kind==='desk'){ n.cap=it.cap; n.slots=[...it.slots]; n.styles=it.styles.map(o=>({...o})); } n.locked=it.locked; render(); saveLocal(); e.preventDefault(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='d'){ const id=makeItem(it.kind,it.x+24,it.y+24,it.w,it.h,{label:it.label,cap:it.cap}); const n=state.items[id]; if(it.kind==='desk'){ n.cap=it.cap; n.slots=it.slots.map(cloneStudent); n.styles=(it.styles||[]).map(o=>({...o})); } n.locked=it.locked; render(); saveLocal(); e.preventDefault(); }
     });
 
     // ======= Çekmece (aynı panel) =======
@@ -294,6 +498,7 @@
     window.addEventListener('resize',()=>{ normalizeLayout(); render(); });
     loadLocal();
     if(Object.keys(state.items).length===0){ setLogo(null); state.school='Okul Adı'; state.klass='9-B'; state.teacher=''; state.date=new Date().toLocaleDateString('tr-TR'); refreshHeader(); makeItem('object',80,HEADER_H+12,520,28,{label:'Tahta'}); makeItem('desk',80,HEADER_H+120,200,110,{cap:2}); makeItem('desk',320,HEADER_H+120,170,110,{cap:1}); }
+    normalizeState();
     render(); renderPool();
     // Varsayılan: sistem teması
     applyTheme(state.theme||'system');
