@@ -67,10 +67,9 @@
     .item.locked{border-style:dashed;opacity:.95}
     .item.selected{outline:3px solid var(--accent);outline-offset:2px}
     .item.circle{border-radius:50%}
-    .item.circle.object .badge{top:50%;transform:translate(-50%,-50%)}
     .handle{position:absolute;top:0;left:0;right:0;height:36px;background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,0));border-bottom:1px solid var(--line);border-radius:12px 12px 0 0;cursor:grab;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:14px}
     .handle .grow{flex:1}
-    .resize{position:absolute;width:16px;height:16px;right:-8px;bottom:-8px;border:2px solid var(--accent);background:var(--surface);border-radius:6px;cursor:nwse-resize}
+    .resize{position:absolute;width:16px;height:16px;right:-8px;bottom:-8px;border:2px solid var(--accent);background:var(--surface);border-radius:6px;cursor:nwse-resize; z-index: 5;}
     .clone-handle {
         position: absolute;
         width: 22px;
@@ -102,7 +101,15 @@
     .student-info{flex:1;text-align:center}
     .student-name{display:block}
     .upload-photo-btn{font-size:10px;color:var(--accent);cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;line-height:1}
-    .badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:800;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip)}
+    .badge{position:absolute;font-size:12px;font-weight:800;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--chip)}
+    
+    .paper.exporting .clone-handle, 
+    .paper.exporting .resize {
+        display: none !important;
+    }
+    .paper.exporting .item.selected {
+        outline: none !important;
+    }
 
     /* Mobil: paneli çekmece olarak göster */
     .scrim{display:none}
@@ -112,9 +119,10 @@
     /* Baskı */
     @media print{
       @page { size: A4 portrait; margin: 10mm; }
-      .app,.appbar,#panel,.scrim{display:none!important}
+      .app,.appbar,#panel,.scrim,.clone-handle,.resize{display:none!important}
       .paper.with-grid{background:none!important}
       .paper .no-export{display:none!important}
+      .item.selected { outline: none !important; }
       body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     }
 
@@ -174,6 +182,19 @@
           <button id="sendToBackBtn" class="btn" style="flex:1">Arkaya Gönder</button>
           <button id="bringToFrontBtn" class="btn" style="flex:1">Öne Getir</button>
         </div>
+        <div class="row" style="margin-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+          <label style="font-size: 11px; color: var(--muted);">Etiket Hizalama:</label>
+          <div class="seg" id="hAlignSeg" style="width: 100%;">
+            <button data-align="left" title="Sola Hizala">Sola</button>
+            <button data-align="center" class="active" title="Ortala">Orta</button>
+            <button data-align="right" title="Sağa Hizala">Sağa</button>
+          </div>
+          <div class="seg" id="vAlignSeg" style="width: 100%;">
+            <button data-align="top" class="active" title="Üste Hizala">Üst</button>
+            <button data-align="center" title="Ortala">Orta</button>
+            <button data-align="bottom" title="Alta Hizala">Alt</button>
+          </div>
+        </div>
         <div class="divider"></div>
       </div>
 
@@ -228,14 +249,14 @@
 
   <script>
     // ======= Durum =======
-    const state={version:64,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, photoSize:44, fontSize:14};
+    const state={version:65,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, photoSize:44, fontSize:14};
     const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
     const paper=$('#paper'), poolEl=$('#studentPool');
     const GRID=16, HEADER_H=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--headerH'))||88; const uid=()=> 'i'+Math.random().toString(36).slice(2,9);
 
     // ======= Depolama =======
-    function saveLocal(){ const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value}; localStorage.setItem('planner-v64', JSON.stringify(data)); }
-    function loadLocal(){ const raw=localStorage.getItem('planner-v64'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=64){ Object.assign(state,d); $('#dateInput').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); $('#photoSize').value=state.photoSize||44; $('#photoSizeVal').textContent=state.photoSize||44; $('#fontSize').value=state.fontSize||14; $('#fontSizeVal').textContent=state.fontSize||14; } }catch(e){}
+    function saveLocal(){ const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value}; localStorage.setItem('planner-v65', JSON.stringify(data)); }
+    function loadLocal(){ const raw=localStorage.getItem('planner-v65'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=65){ Object.assign(state,d); $('#dateInput').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); $('#photoSize').value=state.photoSize||44; $('#photoSizeVal').textContent=state.photoSize||44; $('#fontSize').value=state.fontSize||14; $('#fontSizeVal').textContent=state.fontSize||14; } }catch(e){}
     }
 
     // ======= Başlık =======
@@ -257,7 +278,7 @@
       if (cap === 0) { w = 170; h = 90; }
       if (shape === 'circle') { h = w; }
 
-      const base = {id,kind:'item',x:40,y:HEADER_H + 20,w,h,cap:cap,slots:Array.from({length: cap},()=>({name:'',photo:null})),styles:Array.from({length: cap},()=>({bold:true,color:'#111827'})),label:(opts.label||''),locked:false,shape:shape};
+      const base = {id,kind:'item',x:40,y:HEADER_H + 20,w,h,cap:cap,slots:Array.from({length: cap},()=>({name:'',photo:null})),styles:Array.from({length: cap},()=>({bold:true,color:'#111827'})),label:(opts.label||''),locked:false,shape:shape, labelAlignH: 'center', labelAlignV: 'top'};
       state.items[id] = base;
       state.order.push(id);
       return id;
@@ -304,6 +325,14 @@
         badge.style.opacity = '0.6';
       }
       
+      const hAlign = it.labelAlignH || 'center';
+      const vAlign = it.labelAlignV || 'top';
+      badge.style.top = 'auto'; badge.style.bottom = 'auto'; badge.style.left = 'auto'; badge.style.right = 'auto';
+      let xTransform = '0', yTransform = '0';
+      if (hAlign === 'left') { badge.style.left = '8px'; } else if (hAlign === 'right') { badge.style.right = '8px'; } else { badge.style.left = '50%'; xTransform = '-50%'; }
+      if (vAlign === 'bottom') { badge.style.bottom = '-12px'; } else if (vAlign === 'center') { badge.style.top = '50%'; yTransform = '-50%'; } else { badge.style.top = '-12px'; }
+      badge.style.transform = `translateX(${xTransform}) translateY(${yTransform})`;
+
       if (!it.locked) {
         badge.addEventListener('dblclick', (e) => {
           e.stopPropagation();
@@ -317,14 +346,7 @@
           inp.value = it.label || '';
           
           inp.style.cssText = `position: absolute; text-align: center; z-index: 10; font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--paper); color: var(--ink);`;
-          inp.style.left = '50%';
-          if (it.shape === 'circle' && it.cap === 0) {
-            inp.style.top = '50%';
-            inp.style.transform = 'translate(-50%, -50%)';
-          } else {
-            inp.style.top = '-12px';
-            inp.style.transform = 'translateX(-50%)';
-          }
+          inp.style.left = badge.style.left; inp.style.right = badge.style.right; inp.style.top = badge.style.top; inp.style.bottom = badge.style.bottom; inp.style.transform = badge.style.transform;
 
           currentBadge.style.visibility = 'hidden';
           parentItem.appendChild(inp);
@@ -378,6 +400,10 @@
         selectionPanel.style.display = 'block';
         const it = state.items[state.sel];
         $('#lockItemBtn').textContent = it.locked ? 'Kilidi Aç (L)' : 'Kilitle (L)';
+        const hAlign = it.labelAlignH || 'center';
+        $$('#hAlignSeg button').forEach(b => b.classList.toggle('active', b.dataset.align === hAlign));
+        const vAlign = it.labelAlignV || 'top';
+        $$('#vAlignSeg button').forEach(b => b.classList.toggle('active', b.dataset.align === vAlign));
       } else {
         selectionPanel.style.display = 'none';
       }
@@ -396,10 +422,10 @@
         createdItem.slots = JSON.parse(JSON.stringify(it.slots));
         createdItem.styles = JSON.parse(JSON.stringify(it.styles));
       }
-      createdItem.locked = false; // Klonlanan öğeler kilitli olmaz
-      state.sel = id; // Yeni öğeyi seç
+      createdItem.locked = false; 
+      state.sel = id; 
       render();
-      highlightSelection(); // Paneli yeni seçilen öğe için güncelle
+      highlightSelection();
       saveLocal();
     }
 
@@ -408,7 +434,7 @@
       if (!it) return;
       it.locked = !it.locked;
       render();
-      highlightSelection(); // Düğme metnini ve stilleri güncellemek için
+      highlightSelection();
       saveLocal();
     }
     
@@ -453,7 +479,6 @@
     $('#loadNames').addEventListener('click',()=>{ const txt=$('#names').value.trim(); const items=txt.split(/\n+/).map(s=>s.trim()).filter(Boolean); const placed=new Set(Object.values(state.items).flatMap(it=>it.slots?.map(s=>s.name)||[])); const poolSet=new Set(state.pool); const add=items.filter(n=>!placed.has(n)&&!poolSet.has(n)); state.pool.push(...add); renderPool(); saveLocal(); });
     $('#clearNames').addEventListener('click',()=>{ state.pool=[]; renderPool(); saveLocal(); });
 
-    // YENİ: Öğrencileri rastgele yerleştirme fonksiyonu
     function randomlyPlaceStudents() {
         const availableSlots = [];
         state.order.forEach(id => {
@@ -498,6 +523,19 @@
     $('#bringToFrontBtn').addEventListener('click', bringToFront);
     $('#sendToBackBtn').addEventListener('click', sendToBack);
 
+    $('#hAlignSeg').addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      const align = e.target.dataset.align;
+      const it = currentItem();
+      if (it) { it.labelAlignH = align; render(); highlightSelection(); saveLocal(); }
+    });
+    $('#vAlignSeg').addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      const align = e.target.dataset.align;
+      const it = currentItem();
+      if (it) { it.labelAlignV = align; render(); highlightSelection(); saveLocal(); }
+    });
+
     // ======= Sıra Görünümü Kontrolleri =======
     $('#photoSize').addEventListener('input', e => { const size = e.target.value; state.photoSize = parseInt(size); $('#photoSizeVal').textContent = size; render(); });
     $('#photoSize').addEventListener('change', saveLocal);
@@ -512,7 +550,7 @@
 
     // Gizli dosya inputu
     const hiddenInput=document.createElement('input'); hiddenInput.type='file'; hiddenInput.accept='application/json'; hiddenInput.style.display='none'; document.body.appendChild(hiddenInput);
-    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=64){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
+    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=65){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
 
     // ======= Toggle'lar =======
     $('#snapToggle').addEventListener('change',e=>{ state.snap=e.target.checked; saveLocal(); });
@@ -520,31 +558,18 @@
 
     // ======= Klavye =======
     document.addEventListener('keydown',e=>{
-      // Metin alanlarına (input, textarea) veya düzenleme modundaki bir öğeye yazarken genel kısayolları engelle
-      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-        return;
-      }
-
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
       const it=currentItem(); 
       if(!it) return; 
 
-      // Seçili öğeyi silme
       if(e.key==='Delete'){ 
-        e.preventDefault(); // Tarayıcının geri gitme gibi varsayılan eylemlerini engelle
-        // Eğer silinen bir sıraysa, içindeki öğrencileri havuza geri gönder
-        if (it.cap > 0 && it.slots) {
-          it.slots.forEach(slot => {
-            if (slot && slot.name && !state.pool.includes(slot.name)) {
-              state.pool.push(slot.name);
-            }
-          });
-        }
-        // Öğeyi sil
+        e.preventDefault(); 
+        if (it.cap > 0 && it.slots) { it.slots.forEach(slot => { if (slot && slot.name && !state.pool.includes(slot.name)) { state.pool.push(slot.name); } }); }
         delete state.items[it.id];
         state.order=state.order.filter(x=>x!==it.id);
         state.sel=null;
         state.selSlot=null;
-        renderPool(); // Havuzu güncelle
+        renderPool(); 
         render();
         saveLocal();
       }
@@ -559,16 +584,49 @@
     });
 
     // ======= Çekmece (aynı panel) =======
-    const scrim=$$('#scrim');
+    const scrim=$('#scrim');
     $('#btnTools').addEventListener('click',()=>{ document.body.classList.add('drawer-open'); scrim.addEventListener('click',closeDrawer,{once:true}); });
     function closeDrawer(){ document.body.classList.remove('drawer-open'); }
 
     // ======= Dışa aktar resim =======
-    async function exportPNG(){ const hadGrid=paper.classList.contains('with-grid'); paper.classList.add('exporting'); paper.classList.remove('with-grid'); if(!window.html2canvas){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }).catch(()=>{}); } try{ if(!window.html2canvas) throw new Error('html2canvas yüklenemedi'); const r=paper.getBoundingClientRect(); const canvas=await window.html2canvas(paper,{scale:2,backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--paper').trim()||'#ffffff',useCORS:true,width:Math.round(r.width),height:Math.round(r.height)}); const png=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=png; a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.png`; a.click(); }catch(e){ alert('Resim dışa aktarım başarısız oldu.'); } finally { if(hadGrid) paper.classList.add('with-grid'); paper.classList.remove('exporting'); }
+    async function exportPNG(){ 
+      state.sel = null; render(); // Seçimi kaldır
+      const hadGrid=paper.classList.contains('with-grid'); 
+      paper.classList.add('exporting'); 
+      paper.classList.remove('with-grid'); 
+      if(!window.html2canvas){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }).catch(()=>{}); } 
+      try{ 
+        if(!window.html2canvas) throw new Error('html2canvas yüklenemedi'); 
+        const r=paper.getBoundingClientRect(); 
+        const canvas=await window.html2canvas(paper,{scale:2,backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--paper').trim()||'#ffffff',useCORS:true,width:Math.round(r.width),height:Math.round(r.height)}); 
+        const png=canvas.toDataURL('image/png'); 
+        const a=document.createElement('a'); a.href=png; a.download=`sinif-plani_${new Date().toISOString().slice(0,10)}.png`; a.click(); 
+      } catch(e){ 
+        alert('Resim dışa aktarım başarısız oldu.'); 
+      } finally { 
+        if(hadGrid) paper.classList.add('with-grid'); 
+        paper.classList.remove('exporting'); 
+      }
     }
 
     // ======= Yazdır =======
-    function printPaper(){ const wasGrid=paper.classList.contains('with-grid'); paper.classList.remove('with-grid'); const css=`*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}body{margin:0}.paper{position:relative;background:#fff;border:0;width:190mm;height:277mm;overflow:hidden}.header{position:absolute;left:0;top:0;right:0;height:${getComputedStyle(document.documentElement).getPropertyValue('--headerH')};border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;padding:12px 16px;color:#111827;background:#fff}.header .logo{max-width:160px;max-height:64px;object-fit:contain}.header .school{font-weight:800;font-size:16px}.header .class{font-weight:700;color:#334155}.header .teacher{font-weight:700;color:#475569}.header .date{font-size:12px;color:#64748b}.item{position:absolute;background:#fff;border:2px solid #cbd5e1;border-radius:12px;min-width:60px;min-height:40px}.item.circle{border-radius:50%}.desk-body{position:absolute;left:10px;right:10px;top:40px;bottom:10px;display:flex;gap:8px}.slot{flex:1;border:1px dashed #cbd5e1;border-radius:8px;padding:4px;text-align:center;font-weight:800;min-height:36px;display:flex;align-items:center;justify-content:center}.slot-content{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%}.student-photo{width:${state.photoSize*0.9}px;height:${state.photoSize*0.9}px;border-radius:8px;background-size:cover;background-position:center;border:2px solid #cbd5e1;flex-shrink:0;background-color:#eef2ff}.student-info{flex:1;text-align:center}.student-name{display:block;font-size:${state.fontSize*0.95}px;}.upload-photo-btn{display:none}.badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;padding:2px 8px;border:1px solid #e5e7eb;background:#eef2ff;color:#334155}.item.circle .badge{top:50%;transform:translate(-50%,-50%)}.credit-app{display:none}@page{size:A4;margin:10mm}`; const html=`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Yazdır</title><style>${css}</style></head><body>${paper.outerHTML}</body></html>`; const win=window.open('','_blank'); win.document.open(); win.document.write(html); win.document.close(); win.focus(); setTimeout(()=>{ win.print(); if(wasGrid) paper.classList.add('with-grid'); win.close(); },300); }
+    function printPaper(){ 
+        state.sel = null; render(); // Seçimi kaldır
+        const wasGrid=paper.classList.contains('with-grid'); 
+        paper.classList.remove('with-grid'); 
+        const css=`*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}body{margin:0}.paper{position:relative;background:#fff;border:0;width:190mm;height:277mm;overflow:hidden}.header{position:absolute;left:0;top:0;right:0;height:${getComputedStyle(document.documentElement).getPropertyValue('--headerH')};border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;padding:12px 16px;color:#111827;background:#fff}.header .logo{max-width:160px;max-height:64px;object-fit:contain}.header .school{font-weight:800;font-size:16px}.header .class{font-weight:700;color:#334155}.header .teacher{font-weight:700;color:#475569}.header .date{font-size:12px;color:#64748b}.item{position:absolute;background:#fff;border:2px solid #cbd5e1;border-radius:12px;min-width:60px;min-height:40px}.item.circle{border-radius:50%}.desk-body{position:absolute;left:10px;right:10px;top:40px;bottom:10px;display:flex;gap:8px}.slot{flex:1;border:1px dashed #cbd5e1;border-radius:8px;padding:4px;text-align:center;font-weight:800;min-height:36px;display:flex;align-items:center;justify-content:center}.slot-content{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%}.student-photo{width:${state.photoSize*0.9}px;height:${state.photoSize*0.9}px;border-radius:8px;background-size:cover;background-position:center;border:2px solid #cbd5e1;flex-shrink:0;background-color:#eef2ff}.student-info{flex:1;text-align:center}.student-name{display:block;font-size:${state.fontSize*0.95}px;}.upload-photo-btn{display:none}.badge{position:absolute;font-size:11px;font-weight:800;padding:2px 8px;border:1px solid #e5e7eb;background:#eef2ff;color:#334155}.credit-app{display:none}@page{size:A4;margin:10mm}`; 
+        const html=`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Yazdır</title><style>${css}</style></head><body>${paper.outerHTML}</body></html>`; 
+        const win=window.open('','_blank'); 
+        win.document.open(); 
+        win.document.write(html); 
+        win.document.close(); 
+        win.focus(); 
+        setTimeout(()=>{ 
+            win.print(); 
+            if(wasGrid) paper.classList.add('with-grid'); 
+            win.close(); 
+        },300); 
+    }
 
     // ======= Başlat =======
     window.addEventListener('resize',()=>{ normalizeLayout(); render(); });
