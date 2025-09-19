@@ -183,7 +183,7 @@
           <button id="bringToFrontBtn" class="btn" style="flex:1">Öne Getir</button>
         </div>
         <div class="row" style="margin-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
-          <label style="font-size: 11px; color: var(--muted);">Etiket Hizalama:</label>
+          <label style="font-size: 11px; color: var(--muted);">Etiket Konumu:</label>
           <div class="seg" id="hAlignSeg" style="width: 100%;">
             <button data-align="left" title="Sola Hizala">Sola</button>
             <button data-align="center" class="active" title="Ortala">Orta</button>
@@ -193,6 +193,14 @@
             <button data-align="top" class="active" title="Üste Hizala">Üst</button>
             <button data-align="center" title="Ortala">Orta</button>
             <button data-align="bottom" title="Alta Hizala">Alt</button>
+          </div>
+        </div>
+         <div class="row" style="margin-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+          <label style="font-size: 11px; color: var(--muted);">Etiket Yazı Hizalama:</label>
+          <div class="seg" id="textAlignSeg" style="width: 100%;">
+            <button data-align="left" title="Yazıyı Sola Hizala">Sola</button>
+            <button data-align="center" class="active" title="Yazıyı Ortala">Orta</button>
+            <button data-align="right" title="Yazıyı Sağa Hizala">Sağa</button>
           </div>
         </div>
         <div class="divider"></div>
@@ -249,14 +257,14 @@
 
   <script>
     // ======= Durum =======
-    const state={version:65,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, photoSize:44, fontSize:14};
+    const state={version:66,date:'',school:'',klass:'',teacher:'',logo:null,items:{},order:[],pool:[],snap:true,sel:null,selSlot:null, photoSize:44, fontSize:14};
     const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
     const paper=$('#paper'), poolEl=$('#studentPool');
     const GRID=16, HEADER_H=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--headerH'))||88; const uid=()=> 'i'+Math.random().toString(36).slice(2,9);
 
     // ======= Depolama =======
-    function saveLocal(){ const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value}; localStorage.setItem('planner-v65', JSON.stringify(data)); }
-    function loadLocal(){ const raw=localStorage.getItem('planner-v65'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=65){ Object.assign(state,d); $('#dateInput').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); $('#photoSize').value=state.photoSize||44; $('#photoSizeVal').textContent=state.photoSize||44; $('#fontSize').value=state.fontSize||14; $('#fontSizeVal').textContent=state.fontSize||14; } }catch(e){}
+    function saveLocal(){ const data={...state,date:$('#dateInput').value,school:$('#schoolName').value,klass:$('#className').value,teacher:$('#teacherName').value}; localStorage.setItem('planner-v66', JSON.stringify(data)); }
+    function loadLocal(){ const raw=localStorage.getItem('planner-v66'); if(!raw) return; try{ const d=JSON.parse(raw); if(d?.version>=66){ Object.assign(state,d); $('#dateInput').value=d.date||''; $('#schoolName').value=d.school||''; $('#className').value=d.klass||''; $('#teacherName').value=d.teacher||''; $('#snapToggle').checked=!!d.snap; if(d.logo) setLogo(d.logo); refreshHeader(); $('#photoSize').value=state.photoSize||44; $('#photoSizeVal').textContent=state.photoSize||44; $('#fontSize').value=state.fontSize||14; $('#fontSizeVal').textContent=state.fontSize||14; } }catch(e){}
     }
 
     // ======= Başlık =======
@@ -278,7 +286,7 @@
       if (cap === 0) { w = 170; h = 90; }
       if (shape === 'circle') { h = w; }
 
-      const base = {id,kind:'item',x:40,y:HEADER_H + 20,w,h,cap:cap,slots:Array.from({length: cap},()=>({name:'',photo:null})),styles:Array.from({length: cap},()=>({bold:true,color:'#111827'})),label:(opts.label||''),locked:false,shape:shape, labelAlignH: 'center', labelAlignV: 'top'};
+      const base = {id,kind:'item',x:40,y:HEADER_H + 20,w,h,cap:cap,slots:Array.from({length: cap},()=>({name:'',photo:null})),styles:Array.from({length: cap},()=>({bold:true,color:'#111827'})),label:(opts.label||''),locked:false,shape:shape, labelAlignH: 'center', labelAlignV: 'top', labelTextAlign: 'center'};
       state.items[id] = base;
       state.order.push(id);
       return id;
@@ -318,6 +326,8 @@
       
       const badge=document.createElement('div');
       badge.className='badge';
+      badge.style.textAlign = it.labelTextAlign || 'center';
+
       if (it.label) {
         badge.textContent = it.label;
       } else {
@@ -404,6 +414,8 @@
         $$('#hAlignSeg button').forEach(b => b.classList.toggle('active', b.dataset.align === hAlign));
         const vAlign = it.labelAlignV || 'top';
         $$('#vAlignSeg button').forEach(b => b.classList.toggle('active', b.dataset.align === vAlign));
+        const textAlign = it.labelTextAlign || 'center';
+        $$('#textAlignSeg button').forEach(b => b.classList.toggle('active', b.dataset.align === textAlign));
       } else {
         selectionPanel.style.display = 'none';
       }
@@ -535,6 +547,12 @@
       const it = currentItem();
       if (it) { it.labelAlignV = align; render(); highlightSelection(); saveLocal(); }
     });
+     $('#textAlignSeg').addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      const align = e.target.dataset.align;
+      const it = currentItem();
+      if (it) { it.labelTextAlign = align; render(); highlightSelection(); saveLocal(); }
+    });
 
     // ======= Sıra Görünümü Kontrolleri =======
     $('#photoSize').addEventListener('input', e => { const size = e.target.value; state.photoSize = parseInt(size); $('#photoSizeVal').textContent = size; render(); });
@@ -550,7 +568,7 @@
 
     // Gizli dosya inputu
     const hiddenInput=document.createElement('input'); hiddenInput.type='file'; hiddenInput.accept='application/json'; hiddenInput.style.display='none'; document.body.appendChild(hiddenInput);
-    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=65){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
+    hiddenInput.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.version>=66){ Object.assign(state,data); $('#schoolName').value=state.school||''; $('#className').value=state.klass||''; $('#teacherName').value=state.teacher||''; $('#dateInput').value=state.date||''; $('#snapToggle').checked=!!state.snap; setLogo(state.logo||null); refreshHeader(); render(); renderPool(); saveLocal(); } else { alert('Desteklenmeyen sürüm.'); } }catch(e){ alert('Geçersiz dosya.'); } }; r.readAsText(f); });
 
     // ======= Toggle'lar =======
     $('#snapToggle').addEventListener('change',e=>{ state.snap=e.target.checked; saveLocal(); });
